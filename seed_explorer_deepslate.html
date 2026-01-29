@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seed Explorer (Deepslate) – Minecraft Tools</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* [Same styles as seed_explorer.html] */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-void: #05060a;
+            --bg-panel: #0b0d12;
+            --bg-panel-light: #12141a;
+            --accent-purple-start: #A066FF;
+            --accent-purple-end: #C68CFF;
+            --accent-purple: #A066FF;
+            --accent-cyan: #06b6d4;
+            --text-main: #e8e8f0;
+            --text-muted: #9ca3af;
+            --border: #1f2937;
+            --warning-bg: #f59e0b;
+            --success-bg: #10b981;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-void);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Warning Banner */
+        .warning-banner {
+            background: var(--warning-bg);
+            color: #000;
+            padding: 10px 20px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border-bottom: 2px solid #d97706;
+        }
+
+        .warning-banner.success {
+            background: var(--success-bg);
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            height: calc(100vh - 42px - 76px); /* minus banner and hotbar */
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-panel);
+            border-right: 2px solid var(--border);
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: var(--bg-panel);
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--accent-purple-start), var(--accent-purple-end));
+            border-radius: 4px;
+        }
+
+        .sidebar-section {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-section h3 {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent-purple-end);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sidebar-section h3::before {
+            content: '';
+            width: 3px;
+            height: 12px;
+            background: linear-gradient(180deg, var(--accent-purple-start), var(--accent-purple-end));
+            border-radius: 2px;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 8px 10px;
+            background: var(--bg-panel-light);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(160, 102, 255, 0.2);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 14px;
+            background: linear-gradient(135deg, var(--accent-purple-start), var(--accent-purple-end));
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(160, 102, 255, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(160, 102, 255, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .btn-secondary {
+            background: var(--bg-panel-light);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            box-shadow: none;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2);
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        /* Dimension Tabs */
+        .dimension-tabs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .dimension-tab {
+            padding: 8px;
+            background: var(--bg-panel-light);
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            color: var(--text-muted);
+        }
+
+        .dimension-tab:hover {
+            border-color: var(--accent-purple);
+        }
+
+        .dimension-tab.active {
+            background: rgba(160, 102, 255, 0.15);
+            border-color: var(--accent-purple);
+            color: var(--text-main);
+            box-shadow: 0 0 8px rgba(160, 102, 255, 0.3);
+        }
+
+        /* Checkboxes */
+        .checkbox-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent-purple);
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            user-select: none;
+        }
+
+        /* Biome Legend */
+        .biome-legend {
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .biome-legend::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .biome-legend::-webkit-scrollbar-thumb {
+            background: var(--accent-cyan);
+            border-radius: 3px;
+        }
+
+        .biome-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px;
+            background: var(--bg-panel-light);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .biome-item:hover {
+            border-color: var(--accent-purple);
+            transform: translateX(3px);
+        }
+
+        .biome-color {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            flex-shrink: 0;
+        }
+
+        /* Structure List */
+        .structure-list {
+            max-height: 260px;
+            overflow-y: auto;
+        }
+
+        .structure-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .structure-list::-webkit-scrollbar-thumb {
+            background: var(--accent-purple);
+            border-radius: 3px;
+        }
+
+        .structure-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background: var(--bg-panel-light);
+            border-radius: 4px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .structure-item:hover {
+            border-color: var(--accent-purple);
+            transform: translateX(3px);
+        }
+
+        .structure-info {
+            flex: 1;
+        }
+
+        .structure-type {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        .structure-coords {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: 'Courier New', monospace;
+        }
+
+        .structure-distance {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            background: var(--bg-panel);
+            padding: 3px 6px;
+            border-radius: 3px;
+        }
+
+        /* Marker List */
+        .marker-list {
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .marker-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .marker-list::-webkit-scrollbar-thumb {
+            background: #10b981;
+            border-radius: 3px;
+        }
+
+        .marker-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px;
+            background: var(--bg-panel-light);
+            border-radius: 4px;
+            margin-bottom: 4px;
+            border: 1px solid transparent;
+        }
+
+        .marker-item:hover {
+            border-color: #10b981;
+        }
+
+        .marker-name {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .marker-coords {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: 'Courier New', monospace;
+        }
+
+        .marker-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .marker-btn {
+            padding: 3px 6px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            color: var(--text-main);
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .marker-btn:hover {
+            border-color: #10b981;
+        }
+
+        /* Saved Seeds */
+        .saved-seeds-list {
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .saved-seeds-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .saved-seeds-list::-webkit-scrollbar-thumb {
+            background: #a066ff;
+            border-radius: 3px;
+        }
+
+        .saved-seed-item {
+            display: flex;
+            flex-direction: column;
+            padding: 8px;
+            background: var(--bg-panel-light);
+            border-radius: 4px;
+            margin-bottom: 6px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .saved-seed-item:hover {
+            border-color: #a066ff;
+            background: rgba(160, 102, 255, 0.1);
+        }
+
+        .saved-seed-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .saved-seed-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .saved-seed-delete {
+            padding: 2px 6px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            color: #ef4444;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .saved-seed-delete:hover {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .saved-seed-info {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: 'Courier New', monospace;
+        }
+
+        .saved-seed-meta {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Map Area */
+        .map-area {
+            flex: 1;
+            position: relative;
+            background: #000;
+        }
+
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+
+        #canvas:active {
+            cursor: grabbing;
+        }
+
+        /* Tooltip */
+        .map-tooltip {
+            position: absolute;
+            background: rgba(11, 13, 18, 0.95);
+            border: 2px solid var(--accent-purple);
+            border-radius: 6px;
+            padding: 10px 14px;
+            pointer-events: none;
+            font-size: 0.8rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+            z-index: 50;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .map-tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 3px;
+        }
+
+        .tooltip-line:last-child {
+            margin-bottom: 0;
+        }
+
+        .tooltip-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .tooltip-value {
+            color: var(--accent-cyan);
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Map Info */
+        .map-info {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: rgba(11, 13, 18, 0.95);
+            border: 2px solid var(--accent-purple);
+            border-radius: 6px;
+            padding: 10px 14px;
+            backdrop-filter: blur(10px);
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+        }
+
+        .map-info-line {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+
+        .map-info-line:last-child {
+            margin-bottom: 0;
+        }
+
+        .map-info-label {
+            color: var(--text-muted);
+        }
+
+        .map-info-value {
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        /* Crosshair */
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(160, 102, 255, 0.5);
+            box-shadow: 0 0 4px rgba(160, 102, 255, 0.8);
+        }
+
+        .crosshair::before {
+            width: 100%;
+            height: 2px;
+            top: 50%;
+            left: 0;
+            transform: translateY(-50%);
+        }
+
+        .crosshair::after {
+            width: 2px;
+            height: 100%;
+            left: 50%;
+            top: 0;
+            transform: translateX(-50%);
+        }
+
+        /* Map Controls */
+        .map-controls {
+            position: absolute;
+            bottom: 16px;
+            right: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-btn {
+            width: 36px;
+            height: 36px;
+            background: rgba(11, 13, 18, 0.95);
+            border: 2px solid var(--accent-purple);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-main);
+            font-size: 1.1rem;
+            font-weight: 700;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-btn:hover {
+            background: rgba(160, 102, 255, 0.2);
+            box-shadow: 0 0 12px rgba(160, 102, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        /* Hotbar */
+        .hotbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(11, 13, 18, 0.98);
+            border-top: 2px solid var(--accent-purple);
+            padding: 8px;
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            z-index: 1000;
+            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.7);
+        }
+
+        .hotbar-slot {
+            width: 60px;
+            height: 60px;
+            background: var(--bg-panel);
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            font-size: 0.65rem;
+            font-weight: 600;
+        }
+
+        .hotbar-slot:hover {
+            border-color: var(--accent-purple);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(160, 102, 255, 0.4);
+        }
+
+        .hotbar-slot.active {
+            border-color: var(--accent-cyan);
+            background: rgba(160, 102, 255, 0.15);
+            color: var(--text-main);
+            box-shadow: 0 0 16px rgba(6, 182, 212, 0.4);
+        }
+
+        .hotbar-icon {
+            font-size: 1.5rem;
+            margin-bottom: 2px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 16px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="warning-banner" id="warningBanner">
+        Initializing Deepslate Engine...
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Seed Configuration -->
+            <div class="sidebar-section">
+                <h3>🌍 Seed & Version</h3>
+
+                <div class="form-group">
+                    <label>World Seed</label>
+                    <input type="text" id="seedInput" placeholder="Enter seed or leave blank">
+                </div>
+
+                <div class="btn-group" style="margin-bottom: 12px;">
+                    <button class="btn btn-secondary" id="randomBtn">🎲 Random</button>
+                    <button class="btn" id="generateBtn">✨ Generate</button>
+                    <button class="btn btn-secondary" id="saveSeedBtn">💾 Save</button>
+                </div>
+
+                <div class="form-group">
+                    <label>Edition</label>
+                    <select id="editionSelect">
+                        <option value="Java">Java Edition</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Version</label>
+                    <select id="versionSelect">
+                        <option value="1.21">1.21 (Latest)</option>
+                        <option value="1.20">1.20</option>
+                        <option value="1.19">1.19</option>
+                        <option value="1.18">1.18</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Dimension</label>
+                    <div class="dimension-tabs">
+                        <div class="dimension-tab active" data-dimension="overworld">Over</div>
+                        <div class="dimension-tab" data-dimension="nether">Nether</div>
+                        <div class="dimension-tab" data-dimension="end">End</div>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary btn-full" id="shareBtn">🔗 Copy View Link</button>
+            </div>
+
+            <!-- Saved Seeds -->
+            <div class="sidebar-section">
+                <h3>⭐ Saved Seeds</h3>
+                <div class="saved-seeds-list" id="savedSeedsList">
+                    <div class="empty-state">No saved seeds</div>
+                </div>
+                <button class="btn btn-secondary btn-full" id="clearSeedsBtn" style="margin-top: 8px;">🗑️ Clear All</button>
+            </div>
+
+            <!-- Navigation -->
+            <div class="sidebar-section">
+                <h3>🧭 Navigation</h3>
+
+                <div class="form-group">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                        <input type="number" id="jumpX" placeholder="X">
+                        <input type="number" id="jumpZ" placeholder="Z">
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary btn-full" id="jumpBtn">🎯 Jump</button>
+            </div>
+
+            <!-- Overlays -->
+            <div class="sidebar-section">
+                <h3>👁️ Overlays</h3>
+
+                <div class="checkbox-list">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="showStructures" checked>
+                        <label for="showStructures">Structures</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="showSlime" checked>
+                        <label for="showSlime">Slime Chunks (Java)</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="showSpawn" checked>
+                        <label for="showSpawn">Spawn Point</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="showGrid">
+                        <label for="showGrid">Chunk Grid</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Biome Legend -->
+            <div class="sidebar-section">
+                <h3>🗺️ Biome Legend</h3>
+                <div class="biome-legend" id="biomeLegend">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Structures in View -->
+            <div class="sidebar-section">
+                <h3>🏛️ Structures in View</h3>
+                <div class="structure-list" id="structureList">
+                    <div class="empty-state">Pan map to find structures</div>
+                </div>
+            </div>
+
+            <!-- Markers -->
+            <div class="sidebar-section">
+                <h3>📍 Saved Markers</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Shift+Click to add</p>
+                <div class="marker-list" id="markerList">
+                    <div class="empty-state">No markers</div>
+                </div>
+                <button class="btn btn-secondary btn-full" id="clearMarkersBtn" style="margin-top: 8px;">🗑️ Clear</button>
+            </div>
+        </div>
+
+        <!-- Map Area -->
+        <div class="map-area">
+            <canvas id="canvas"></canvas>
+
+            <div class="crosshair"></div>
+
+            <div class="map-tooltip" id="tooltip">
+                <div class="tooltip-line">
+                    <span class="tooltip-label">Block:</span>
+                    <span class="tooltip-value" id="tooltipBlock">X: 0, Z: 0</span>
+                </div>
+                <div class="tooltip-line">
+                    <span class="tooltip-label">Chunk:</span>
+                    <span class="tooltip-value" id="tooltipChunk">(0, 0)</span>
+                </div>
+                <div class="tooltip-line">
+                    <span class="tooltip-label">Biome:</span>
+                    <span class="tooltip-value" id="tooltipBiome">Plains</span>
+                </div>
+            </div>
+
+            <div class="map-tooltip" id="structureTooltip">
+                <!-- Structure tooltip populated by JS -->
+            </div>
+
+            <div class="map-info">
+                <div class="map-info-line">
+                    <span class="map-info-label">Seed:</span>
+                    <span class="map-info-value" id="displaySeed">-</span>
+                </div>
+                <div class="map-info-line">
+                    <span class="map-info-label">Center:</span>
+                    <span class="map-info-value" id="displayPos">X: 0, Z: 0</span>
+                </div>
+                <div class="map-info-line">
+                    <span class="map-info-label">Zoom:</span>
+                    <span class="map-info-value" id="displayZoom">1.0x</span>
+                </div>
+            </div>
+
+            <div class="map-controls">
+                <div class="control-btn" id="zoomInBtn" title="Zoom In (+)">+</div>
+                <div class="control-btn" id="zoomOutBtn" title="Zoom Out (-)">−</div>
+                <div class="control-btn" id="resetBtn" title="Reset (Home)">⌂</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hotbar -->
+    <div class="hotbar">
+        <a href="index.html" class="hotbar-slot">
+            <div class="hotbar-icon">🏠</div>
+            HOME
+        </a>
+        <a href="enchantment_calculator.html" class="hotbar-slot">
+            <div class="hotbar-icon">📘</div>
+            ENCHANT
+        </a>
+        <a href="minecraft_journal.html" class="hotbar-slot">
+            <div class="hotbar-icon">📖</div>
+            JOURNAL
+        </a>
+        <a href="nether_hub_calculator.html" class="hotbar-slot">
+            <div class="hotbar-icon">🚇</div>
+            NETHER
+        </a>
+        <a href="potion_brewing_guide.html" class="hotbar-slot">
+            <div class="hotbar-icon">🧪</div>
+            POTIONS
+        </a>
+    </div>
+
+    <!-- Deepslate Library (CDN) -->
+    <script src="https://unpkg.com/deepslate@0.24.0/min.js"></script>
+
+    <!-- App Modules -->
+    <script src="worldgen-interface.js"></script>
+    <script src="java-random.js"></script> <!-- Still useful for slime chunks -->
+    <script src="worldgen-deepslate.js"></script>
+    <script src="renderer.js"></script>
+    <script src="app-deepslate.js"></script>
+</body>
+</html>

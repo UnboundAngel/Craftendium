@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seed Explorer V2 (Deepslate)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Seed & Version -->
+            <div class="sidebar-section">
+                <h3>🌍 Seed & Version</h3>
+                <div class="form-group">
+                    <label>World Seed</label>
+                    <input type="text" id="seedInput" placeholder="Enter seed" value="12345">
+                </div>
+                <div class="btn-group" style="margin-bottom: 12px;">
+                    <button class="btn btn-secondary" id="randomBtn">🎲 Random</button>
+                    <button class="btn" id="generateBtn">✨ Generate</button>
+                </div>
+                <div class="form-group">
+                    <label>Version</label>
+                    <select id="versionSelect">
+                        <option value="1.21">1.21 (Latest)</option>
+                        <option value="1.20">1.20</option>
+                        <option value="1.19">1.19</option>
+                        <option value="1.18">1.18</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Map Layers -->
+            <div class="sidebar-section">
+                <h3>Layers</h3>
+                <div class="checkbox-list">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="showBiomes" checked>
+                        <span>Biomes</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="showSlimeChunks">
+                        <span>Slime Chunks</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="showStructures" checked>
+                        <span>Structures</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="sidebar-section">
+                <h3>🧭 Navigation</h3>
+                <div class="form-group">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                        <input type="number" id="jumpX" placeholder="X">
+                        <input type="number" id="jumpZ" placeholder="Z">
+                    </div>
+                </div>
+                <button class="btn btn-secondary btn-full" id="jumpBtn">🎯 Jump</button>
+            </div>
+
+            <!-- Markers (The Missing Section) -->
+            <div class="sidebar-section">
+                <h3>📍 Saved Markers</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Shift+Click to add</p>
+                <div class="marker-list" id="markerList">
+                    <div class="empty-state">No markers</div>
+                </div>
+                <button class="btn btn-secondary btn-full" id="clearMarkersBtn" style="margin-top: 8px;">🗑️ Clear</button>
+            </div>
+
+            <!-- Biome Legend -->
+            <div class="sidebar-section">
+                <h3>🗺️ Biome Legend</h3>
+                <div class="biome-legend" id="biomeLegend">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Area -->
+        <div class="map-area">
+            <canvas id="canvas"></canvas>
+
+            <div class="map-info">
+                <div class="map-info-line">
+                    <span class="map-info-label">Seed:</span>
+                    <span class="map-info-value" id="displaySeed">-</span>
+                </div>
+                <div class="map-info-line">
+                    <span class="map-info-label">Center:</span>
+                    <span class="map-info-value" id="displayPos">X: 0, Z: 0</span>
+                </div>
+                <div class="map-info-line">
+                    <span class="map-info-label">Zoom:</span>
+                    <span class="map-info-value" id="displayZoom">1.0x</span>
+                </div>
+            </div>
+
+            <div class="map-controls">
+                <div class="control-btn" id="zoomInBtn" title="Zoom In">+</div>
+                <div class="control-btn" id="zoomOutBtn" title="Zoom Out">−</div>
+            </div>
+            
+    </div>
+
+    <div class="map-tooltip" id="tooltip">
+        <div class="tooltip-line">
+            <span class="tooltip-label">Block:</span>
+            <span class="tooltip-value" id="tooltipBlock">0, 0</span>
+        </div>
+        <div class="tooltip-line">
+            <span class="tooltip-label">Biome:</span>
+            <span class="tooltip-value" id="tooltipBiome">-</span>
+        </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

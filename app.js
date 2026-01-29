@@ -20,6 +20,9 @@ class SeedExplorerApp {
         this.lastMouseY = 0;
         this.lastClickX = 0;
         this.lastClickY = 0;
+        
+        // Timer for debouncing high-quality render after zoom
+        this.wheelTimer = null;
 
         // Markers
         this.markers = [];
@@ -187,7 +190,8 @@ class SeedExplorerApp {
                     this.lastMouseX = e.clientX;
                     this.lastMouseY = e.clientY;
 
-                    this.renderer.render();
+                    // Pass true for "isInteracting" to use lower resolution while dragging
+                    this.renderer.render(true);
                     this.updateInfo();
                     this.updateStructureList();
                 }
@@ -201,6 +205,11 @@ class SeedExplorerApp {
         canvas.onmouseup = (e) => {
             const wasDragging = this.isDragging;
             this.isDragging = false;
+            
+            // If we were dragging, do a final high-quality render now that we stopped
+            if (wasDragging) {
+                this.renderer.render(false);
+            }
 
             // Handle marker placement on Shift+Click or Ctrl+Click
             // Only if this wasn't an actual drag operation
@@ -258,7 +267,15 @@ class SeedExplorerApp {
             this.renderer.camera.centerBlockX += beforeBlock.blockX - afterBlock.blockX;
             this.renderer.camera.centerBlockZ += beforeBlock.blockZ - afterBlock.blockZ;
 
-            this.renderer.render();
+            // Render fast (low quality) while scrolling
+            this.renderer.render(true);
+            
+            // Debounce high quality render
+            if (this.wheelTimer) clearTimeout(this.wheelTimer);
+            this.wheelTimer = setTimeout(() => {
+                this.renderer.render(false);
+            }, 200);
+
             this.updateInfo();
             this.updateStructureList();
         };
@@ -337,7 +354,10 @@ class SeedExplorerApp {
         if (seedInput === '') {
             this.renderer.seed = Math.floor(Math.random() * 2147483647);
             document.getElementById('seedInput').value = this.renderer.seed;
-        } else if (isNaN(seedInput)) {
+        } else if (/^-?\d+$/.test(seedInput)) {
+            // Keep numeric seeds as strings to preserve 64-bit precision
+            this.renderer.seed = seedInput;
+        } else {
             // Hash string seed
             let hash = 0;
             for (let i = 0; i < seedInput.length; i++) {
@@ -345,8 +365,6 @@ class SeedExplorerApp {
                 hash = hash & hash;
             }
             this.renderer.seed = hash;
-        } else {
-            this.renderer.seed = parseInt(seedInput);
         }
 
         this.renderer.edition = document.getElementById('editionSelect').value;

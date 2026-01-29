@@ -41,7 +41,32 @@ class Renderer {
         // Hover state
         this.hoveredStructure = null;
 
+        // Structure Icons
+        this.iconImages = {};
+        this.preloadIcons();
+
         this.resizeCanvas();
+    }
+
+    preloadIcons() {
+        const icons = [
+            'village', 'desert_pyramid', 'jungle_temple', 'swamp_hut', 'igloo',
+            'ocean_monument', 'mansion', 'outpost', 'shipwreck', 'fortress',
+            'bastion', 'end_city', 'ruined_portal', 'ocean_ruin',
+            'buried_treasure', 'stronghold', 'mineshaft'
+        ];
+
+        icons.forEach(name => {
+            const img = new Image();
+            img.src = `images/structures/${name}.png`;
+            img.onload = () => {
+                this.iconImages[name] = img;
+                this.render(); // Re-render when icon loads
+            };
+            // Map common aliases just in case
+            if (name === 'desert_pyramid') this.iconImages['desert_temple'] = img;
+            if (name === 'jungle_temple') this.iconImages['jungle_pyramid'] = img;
+        });
     }
 
     resizeCanvas() {
@@ -65,7 +90,7 @@ class Renderer {
         this.camera.pixelsPerBlock = this.camera.zoom;
     }
 
-    render() {
+    render(isInteracting = false) {
         const w = this.cssWidth;
         const h = this.cssHeight;
         const ctx = this.ctx;
@@ -79,7 +104,7 @@ class Renderer {
         const bottomRight = Coords.screenToBlock(w, h, this.camera, w, h);
 
         // Draw biomes with adaptive sampling
-        this.drawBiomes(topLeft, bottomRight, w, h);
+        this.drawBiomes(topLeft, bottomRight, w, h, isInteracting);
 
         // Draw overlays
         if (this.showGrid && this.camera.zoom >= 0.5) {
@@ -102,18 +127,21 @@ class Renderer {
         this.drawMarkers(w, h);
     }
 
-    drawBiomes(topLeft, bottomRight, w, h) {
+    drawBiomes(topLeft, bottomRight, w, h, isInteracting) {
         const ctx = this.ctx;
 
-        // Adaptive sampling: don't sample every block at low zoom
-        const sampleSpacing = Math.max(1, Math.floor(20 / this.camera.pixelsPerBlock));
+        // Adaptive sampling: 
+        // - Interaction (Dragging/Zooming): Coarse resolution (16px target) for 60FPS
+        // - Idle: High resolution (4px target) for quality
+        let targetPixels = isInteracting ? 16 : 4;
+        const sampleSpacing = Math.max(1, Math.floor(targetPixels / this.camera.pixelsPerBlock));
 
-        for (let blockZ = Math.floor(topLeft.blockZ / sampleSpacing) * sampleSpacing;
-             blockZ <= bottomRight.blockZ;
-             blockZ += sampleSpacing) {
-            for (let blockX = Math.floor(topLeft.blockX / sampleSpacing) * sampleSpacing;
-                 blockX <= bottomRight.blockX;
-                 blockX += sampleSpacing) {
+        // Quantize start positions to the spacing grid to avoid "swimming" textures when panning
+        const startZ = Math.floor(topLeft.blockZ / sampleSpacing) * sampleSpacing;
+        const startX = Math.floor(topLeft.blockX / sampleSpacing) * sampleSpacing;
+
+        for (let blockZ = startZ; blockZ <= bottomRight.blockZ; blockZ += sampleSpacing) {
+            for (let blockX = startX; blockX <= bottomRight.blockX; blockX += sampleSpacing) {
 
                 const biomeId = this.worldgen.getBiomeAt(
                     this.seed, this.edition, this.version, this.dimension,
@@ -128,287 +156,16 @@ class Renderer {
                 const size = sampleSpacing * this.camera.pixelsPerBlock;
 
                 // Fill base color
+                // Math.ceil ensures we don't have sub-pixel gaps between rectangles
                 ctx.fillStyle = color;
-                ctx.fillRect(screen.x, screen.y, size + 1, size + 1); // +1 to avoid gaps
-
-                // Add texture pattern at high zoom (>= 4x)
-                if (this.camera.zoom >= 4 && size >= 8) {
-                    this.drawBiomeTexture(ctx, biomeId, screen.x, screen.y, size, blockX, blockZ);
-                }
+                ctx.fillRect(
+                    Math.floor(screen.x), 
+                    Math.floor(screen.y), 
+                    Math.ceil(size), 
+                    Math.ceil(size)
+                );
             }
         }
-
-        // Draw subtle borders between biomes at high zoom
-        if (this.camera.zoom >= 2) {
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
-            ctx.lineWidth = 1;
-
-            const borderSpacing = Math.max(8, sampleSpacing);
-            for (let blockZ = Math.floor(topLeft.blockZ / borderSpacing) * borderSpacing;
-                 blockZ <= bottomRight.blockZ;
-                 blockZ += borderSpacing) {
-                for (let blockX = Math.floor(topLeft.blockX / borderSpacing) * borderSpacing;
-                     blockX <= bottomRight.blockX;
-                     blockX += borderSpacing) {
-
-                    const biomeId = this.worldgen.getBiomeAt(this.seed, this.edition, this.version, this.dimension, blockX, blockZ);
-                    const rightBiome = this.worldgen.getBiomeAt(this.seed, this.edition, this.version, this.dimension, blockX + borderSpacing, blockZ);
-                    const downBiome = this.worldgen.getBiomeAt(this.seed, this.edition, this.version, this.dimension, blockX, blockZ + borderSpacing);
-
-                    if (biomeId !== rightBiome) {
-                        const screen = Coords.blockToScreen(blockX + borderSpacing, blockZ, this.camera, w, h);
-                        ctx.beginPath();
-                        ctx.moveTo(screen.x, screen.y);
-                        ctx.lineTo(screen.x, screen.y + borderSpacing * this.camera.pixelsPerBlock);
-                        ctx.stroke();
-                    }
-
-                    if (biomeId !== downBiome) {
-                        const screen = Coords.blockToScreen(blockX, blockZ + borderSpacing, this.camera, w, h);
-                        ctx.beginPath();
-                        ctx.moveTo(screen.x, screen.y);
-                        ctx.lineTo(screen.x + borderSpacing * this.camera.pixelsPerBlock, screen.y);
-                        ctx.stroke();
-                    }
-                }
-            }
-        }
-    }
-
-    drawBiomeTexture(ctx, biomeId, x, y, size, blockX, blockZ) {
-        // Use block coordinates for deterministic pseudo-random positioning
-        const hash = (blockX * 374761393 + blockZ * 668265263) & 0x7FFFFFFF;
-        const random = () => {
-            const x = Math.sin(hash + blockX + blockZ) * 10000;
-            return x - Math.floor(x);
-        };
-
-        ctx.save();
-
-        switch (biomeId) {
-            case 'desert':
-                // Sandy dune pattern - light dots
-                ctx.fillStyle = 'rgba(255, 255, 230, 0.15)';
-                for (let i = 0; i < 3; i++) {
-                    const dx = (hash * (i + 1) * 7) % size;
-                    const dy = (hash * (i + 2) * 11) % size;
-                    ctx.fillRect(x + dx, y + dy, 2, 2);
-                }
-                // Darker sand patches
-                ctx.fillStyle = 'rgba(139, 90, 43, 0.1)';
-                const patchX = (hash * 13) % size;
-                const patchY = (hash * 17) % size;
-                ctx.fillRect(x + patchX, y + patchY, size / 3, size / 3);
-                break;
-
-            case 'cherry_grove':
-            case 'cherry_blossom':
-                // Pink cherry petals
-                ctx.fillStyle = 'rgba(255, 182, 193, 0.4)';
-                for (let i = 0; i < 4; i++) {
-                    const dx = (hash * (i + 3) * 5) % size;
-                    const dy = (hash * (i + 4) * 7) % size;
-                    ctx.beginPath();
-                    ctx.arc(x + dx, y + dy, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                break;
-
-            case 'snowy_tundra':
-            case 'snowy_taiga':
-            case 'snowy_plains':
-            case 'snowy_slopes':
-            case 'snowy_beach':
-                // Snow sparkles - white dots
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                for (let i = 0; i < 5; i++) {
-                    const dx = (hash * (i + 5) * 9) % size;
-                    const dy = (hash * (i + 6) * 13) % size;
-                    ctx.fillRect(x + dx, y + dy, 1, 1);
-                }
-                break;
-
-            case 'swamp':
-            case 'mangrove_swamp':
-                // Murky water pattern - dark ripples
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
-                ctx.lineWidth = 1;
-                const rippleY = (hash * 19) % size;
-                ctx.beginPath();
-                ctx.moveTo(x, y + rippleY);
-                ctx.lineTo(x + size, y + rippleY);
-                ctx.stroke();
-                break;
-
-            case 'mushroom_fields':
-            case 'mushroom_field_shore':
-                // Mushroom dots - red and brown spots
-                ctx.fillStyle = 'rgba(139, 0, 0, 0.2)';
-                const mushX1 = (hash * 23) % size;
-                const mushY1 = (hash * 29) % size;
-                ctx.beginPath();
-                ctx.arc(x + mushX1, y + mushY1, 3, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = 'rgba(139, 69, 19, 0.2)';
-                const mushX2 = (hash * 31) % size;
-                const mushY2 = (hash * 37) % size;
-                ctx.beginPath();
-                ctx.arc(x + mushX2, y + mushY2, 2, 0, Math.PI * 2);
-                ctx.fill();
-                break;
-
-            case 'jungle':
-            case 'bamboo_jungle':
-            case 'sparse_jungle':
-                // Dense foliage - dark green patches
-                ctx.fillStyle = 'rgba(0, 50, 0, 0.15)';
-                for (let i = 0; i < 3; i++) {
-                    const dx = (hash * (i + 7) * 11) % size;
-                    const dy = (hash * (i + 8) * 13) % size;
-                    ctx.fillRect(x + dx, y + dy, 4, 4);
-                }
-                break;
-
-            case 'badlands':
-            case 'wooded_badlands':
-            case 'eroded_badlands':
-                // Layered rock pattern - horizontal stripes
-                ctx.fillStyle = 'rgba(139, 69, 19, 0.1)';
-                ctx.fillRect(x, y + size * 0.3, size, 2);
-                ctx.fillStyle = 'rgba(205, 92, 92, 0.1)';
-                ctx.fillRect(x, y + size * 0.6, size, 2);
-                break;
-
-            case 'ocean':
-            case 'deep_ocean':
-            case 'warm_ocean':
-            case 'frozen_ocean':
-                // Wave pattern - light horizontal lines
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-                ctx.lineWidth = 1;
-                const wave1 = (blockZ * 3) % 8;
-                const wave2 = (blockZ * 5) % 12;
-                ctx.beginPath();
-                ctx.moveTo(x, y + wave1);
-                ctx.lineTo(x + size, y + wave1);
-                ctx.moveTo(x, y + wave2);
-                ctx.lineTo(x + size, y + wave2);
-                ctx.stroke();
-                break;
-
-            case 'beach':
-            case 'stone_shore':
-                // Pebbles - small circles
-                ctx.fillStyle = 'rgba(128, 128, 128, 0.15)';
-                for (let i = 0; i < 2; i++) {
-                    const dx = (hash * (i + 9) * 7) % size;
-                    const dy = (hash * (i + 10) * 11) % size;
-                    ctx.beginPath();
-                    ctx.arc(x + dx, y + dy, 1.5, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                break;
-
-            case 'meadow':
-                // Flower dots - various colors
-                const flowerColors = [
-                    'rgba(255, 0, 0, 0.3)',    // Red
-                    'rgba(255, 255, 0, 0.3)',  // Yellow
-                    'rgba(255, 192, 203, 0.3)' // Pink
-                ];
-                for (let i = 0; i < 3; i++) {
-                    ctx.fillStyle = flowerColors[i];
-                    const dx = (hash * (i + 11) * 9) % size;
-                    const dy = (hash * (i + 12) * 13) % size;
-                    ctx.beginPath();
-                    ctx.arc(x + dx, y + dy, 1, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                break;
-
-            case 'sunflower_plains':
-                // Sunflower heads - yellow dots
-                ctx.fillStyle = 'rgba(255, 215, 0, 0.4)';
-                for (let i = 0; i < 2; i++) {
-                    const dx = (hash * (i + 13) * 11) % size;
-                    const dy = (hash * (i + 14) * 7) % size;
-                    ctx.beginPath();
-                    ctx.arc(x + dx, y + dy, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                break;
-
-            case 'ice_spikes':
-            case 'frozen_peaks':
-                // Ice crystals - light blue triangular shapes
-                ctx.strokeStyle = 'rgba(173, 216, 230, 0.3)';
-                ctx.lineWidth = 1;
-                const spikeX = (hash * 41) % size;
-                const spikeY = (hash * 43) % size;
-                ctx.beginPath();
-                ctx.moveTo(x + spikeX, y + spikeY);
-                ctx.lineTo(x + spikeX + 3, y + spikeY + 5);
-                ctx.lineTo(x + spikeX - 3, y + spikeY + 5);
-                ctx.closePath();
-                ctx.stroke();
-                break;
-
-            case 'nether_wastes':
-                // Netherrack texture - dark red patches
-                ctx.fillStyle = 'rgba(80, 20, 20, 0.15)';
-                for (let i = 0; i < 4; i++) {
-                    const dx = (hash * (i + 15) * 7) % size;
-                    const dy = (hash * (i + 16) * 9) % size;
-                    ctx.fillRect(x + dx, y + dy, 2, 2);
-                }
-                break;
-
-            case 'warped_forest':
-                // Warped vegetation - cyan dots
-                ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
-                for (let i = 0; i < 3; i++) {
-                    const dx = (hash * (i + 17) * 11) % size;
-                    const dy = (hash * (i + 18) * 13) % size;
-                    ctx.beginPath();
-                    ctx.arc(x + dx, y + dy, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                break;
-
-            case 'crimson_forest':
-                // Crimson vegetation - red dots
-                ctx.fillStyle = 'rgba(220, 20, 60, 0.2)';
-                for (let i = 0; i < 3; i++) {
-                    const dx = (hash * (i + 19) * 13) % size;
-                    const dy = (hash * (i + 20) * 7) % size;
-                    ctx.beginPath();
-                    ctx.arc(x + dx, y + dy, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                break;
-
-            case 'soul_sand_valley':
-                // Soul fire - blue flame-like marks
-                ctx.fillStyle = 'rgba(100, 149, 237, 0.15)';
-                const flameX = (hash * 47) % size;
-                const flameY = (hash * 53) % size;
-                ctx.fillRect(x + flameX, y + flameY, 2, 4);
-                break;
-
-            case 'basalt_deltas':
-                // Basalt columns - vertical dark lines
-                ctx.strokeStyle = 'rgba(20, 20, 20, 0.2)';
-                ctx.lineWidth = 1;
-                const colX = (hash * 59) % size;
-                ctx.beginPath();
-                ctx.moveTo(x + colX, y);
-                ctx.lineTo(x + colX, y + size);
-                ctx.stroke();
-                break;
-        }
-
-        ctx.restore();
     }
 
     drawChunkGrid(topLeft, bottomRight, w, h) {
@@ -505,7 +262,7 @@ class Renderer {
         );
 
         const ctx = this.ctx;
-        const colors = {
+        const fallbackColors = {
             village: '#fbbf24',
             desert_pyramid: '#f59e0b',
             jungle_temple: '#84cc16',
@@ -522,23 +279,51 @@ class Renderer {
 
         this.cachedStructures.forEach(s => {
             const screen = Coords.blockToScreen(s.blockX, s.blockZ, this.camera, w, h);
-            const color = colors[s.type] || '#ff0000';
-
+            
             // Check if mouse is hovering over this structure
             const isHovered = this.hoveredStructure &&
                              this.hoveredStructure.blockX === s.blockX &&
                              this.hoveredStructure.blockZ === s.blockZ;
 
-            // Draw structure icon
-            const size = isHovered ? 8 : 6;
-            ctx.fillStyle = color;
-            ctx.strokeStyle = isHovered ? '#fff' : '#fff';
-            ctx.lineWidth = isHovered ? 3 : 2;
+            const icon = this.iconImages[s.type];
 
-            ctx.beginPath();
-            ctx.arc(screen.x, screen.y, size, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
+            if (icon) {
+                // Draw Icon
+                // Base size 24px, expand to 28px on hover
+                const size = isHovered ? 28 : 24;
+                
+                // Draw white glow/outline behind icon if hovered for better visibility
+                if (isHovered) {
+                    ctx.shadowColor = 'white';
+                    ctx.shadowBlur = 10;
+                } else {
+                    ctx.shadowBlur = 0;
+                }
+
+                ctx.drawImage(
+                    icon, 
+                    screen.x - size / 2, 
+                    screen.y - size / 2, 
+                    size, 
+                    size
+                );
+                
+                // Reset shadow
+                ctx.shadowBlur = 0;
+
+            } else {
+                // Fallback: Colored Circle
+                const color = fallbackColors[s.type] || '#ff0000';
+                const size = isHovered ? 8 : 6;
+                ctx.fillStyle = color;
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = isHovered ? 3 : 2;
+
+                ctx.beginPath();
+                ctx.arc(screen.x, screen.y, size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
 
             // Draw label at medium-high zoom or when hovered
             if (this.camera.zoom >= 3 || isHovered) {
@@ -547,9 +332,14 @@ class Renderer {
                 ctx.textAlign = 'center';
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 3;
-                const label = s.type.replace('_', ' ');
-                ctx.strokeText(label, screen.x, screen.y - (isHovered ? 14 : 10));
-                ctx.fillText(label, screen.x, screen.y - (isHovered ? 14 : 10));
+                
+                const label = s.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                
+                // Position text below the icon (offset depends on whether it's an image or circle)
+                const textY = screen.y + (icon ? 18 : 12);
+                
+                ctx.strokeText(label, screen.x, textY);
+                ctx.fillText(label, screen.x, textY);
             }
         });
     }

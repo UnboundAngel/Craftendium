@@ -1,0 +1,122 @@
+Executive Summary:
+The "Misode" project documentation describes the `deepslate` library, a comprehensive TypeScript/JavaScript re-implementation of Minecraft's core internal systems. It is designed to emulate Minecraft's data structures (NBT, BlockStates), rendering pipeline (WebGL, meshes), and procedural world generation (noise, biomes, density functions) in a browser or Node.js environment. The architecture is modular, separating core data logic from rendering and generation, making it suitable for web-based tools like seed explorers, structure viewers, and datapack generators.
+
+File-by-File Breakdown:
+
+1. Architecture Overview.md
+   - **Core Functionality**: High-level map of the library's modules (`core`, `render`, `worldgen`, `nbt`, `math`, `util`). Explains the separation of concerns.
+   - **Thought Process**: Provides the "big picture". Crucial for understanding how `StructureRenderer` relies on `core` data and `worldgen` produces `Chunks`.
+   - **Dependencies**: Links to all major subsystems.
+
+2. BiomesAndClimate.md
+   - **Core Functionality**: Explains biome selection via multi-noise climate parameters (Temperature, Humidity, Continentalness, Erosion, Depth, Weirdness). Details `MultiNoiseBiomeSource` and `RTree` optimization.
+   - **Thought Process**: Essential for the Seed Explorer. Describes how `TargetPoint` (world coords) maps to `ParamPoint` (biome definition) using Euclidean distance.
+   - **Dependencies**: Relies on `DensityFunctions` and `NoiseRouter`.
+
+3. BlockAndItemColors.md
+   - **Core Functionality**: Rendering logic for dynamic colors (grass, foliage, water, redstone power, potions). Uses `BlockColors` map and `ItemTint` strategies.
+   - **Thought Process**: Explains why grass looks different in different biomes. Critical for visual accuracy in the map renderer.
+   - **Dependencies**: `RenderingSystem`, `BlockState`, `ItemStack`.
+
+4. BlockRendering.md
+   - **Core Functionality**: Pipeline for converting `BlockState` to 3D meshes. Covers `BlockModel`, `BlockDefinition`, face culling, and `ChunkBuilder`.
+   - **Thought Process**: Deep dive into the visual layer. Explains how `chunking` optimizes large structure rendering.
+   - **Dependencies**: `StructureRendering`, `BlockState`.
+
+5. BlockState.md
+   - **Core Functionality**: The atomic unit of the world. Combines `Identifier` (e.g., `minecraft:stone`) with properties (e.g., `facing=north`).
+   - **Thought Process**: Foundational data structure. Used everywhere (rendering, storage, worldgen).
+   - **Dependencies**: `Identifier`, `CoreDataModel`.
+
+6. ChunkGeneration.md
+   - **Core Functionality**: The process of filling chunks with blocks using `NoiseChunkGenerator`. Uses cell-based processing for efficiency.
+   - **Thought Process**: The "engine" of worldgen. Connects math (noise) to data (blocks).
+   - **Dependencies**: `NoiseFunctions`, `DensityFunctions`, `BiomesAndClimate`.
+
+7. CoreDataModel.md
+   - **Core Functionality**: Defines base classes: `Identifier`, `BlockState`, `ItemStack`, `Structure`, `Chunk`, `Registry`.
+   - **Thought Process**: The API reference for the basic types used throughout the library.
+   - **Dependencies**: Foundational to all other modules.
+
+8. DensityFunctions.md
+   - **Core Functionality**: The mathematical "shape" of the world. Functions mapping (x, y, z) to density values. Covers `Noise`, `Spline`, `Clamp`, `YClampedGradient`.
+   - **Thought Process**: Advanced math layer. Explains how terrain shape, caves, and overhangs are mathematically defined.
+   - **Dependencies**: `NoiseFunctions`, `WorldGen`.
+
+9. GettingStarted.md
+   - **Core Functionality**: Installation (`npm install deepslate`) and basic examples (reading NBT, rendering a structure).
+   - **Thought Process**: "Hello World" for the library. Confirms the usage of `unpkg` for CDN access.
+   - **Dependencies**: None.
+
+10. identifiers and registry.md
+    - **Core Functionality**: The namespace system (`minecraft:thing`) and the `Registry` pattern for storing game objects.
+    - **Thought Process**: Explains how data is looked up. Critical for parsing datapacks.
+    - **Dependencies**: `CoreDataModel`.
+
+11. ItemStack.md
+    - **Core Functionality**: Represents inventory items. Includes `count` and `components` (NBT data).
+    - **Thought Process**: Parallel to `BlockState` but for items. Handles complex NBT data like enchantments.
+    - **Dependencies**: `NBTSystem`, `ItemRendering`.
+
+12. MathUtilities.md
+    - **Core Functionality**: Helper functions: `lerp`, `clamp`, `smoothstep`, `CubicSpline`, binary search.
+    - **Thought Process**: The toolkit for procedural generation logic. `CubicSpline` is vital for modern Minecraft terrain.
+    - **Dependencies**: `NoiseFunctions`, `WorldGen`.
+
+13. NBTSystem.md
+    - **Core Functionality**: Binary serialization format (Named Binary Tag). Parsing/writing tags (`NbtCompound`, `NbtInt`, etc.).
+    - **Thought Process**: The file format of Minecraft. Essential for loading `.nbt` structure files.
+    - **Dependencies**: `CoreDataModel`, `Structure`.
+
+14. NoiseFunctions.md
+    - **Core Functionality**: Algorithms for randomness: `PerlinNoise`, `SimplexNoise`, `BlendedNoise`.
+    - **Thought Process**: The source of "randomness" in terrain. Explains `RandomState` management.
+    - **Dependencies**: `RandomNumberGeneration`, `DensityFunctions`.
+
+15. RandomNumberGeneration.md
+    - **Core Functionality**: Deterministic RNGs. `XoroshiroRandom` (modern) vs `LegacyRandom`. Positional seeding.
+    - **Thought Process**: Ensures the same seed always produces the same world.
+    - **Dependencies**: `MathUtilities`.
+
+16. RenderingSystem.md
+    - **Core Functionality**: The overarching WebGL pipeline. `Renderer`, `Mesh`, `StructureRenderer`.
+    - **Thought Process**: How pixels get on the screen. Manages shaders and context.
+    - **Dependencies**: `BlockRendering`, `StructureRendering`.
+
+17. Structure.md
+    - **Core Functionality**: The data class for 3D block arrangements. Uses a palette system for compression.
+    - **Thought Process**: In-memory representation of a building or feature.
+    - **Dependencies**: `BlockState`, `NBTSystem`.
+
+18. StructureRendering.md
+    - **Core Functionality**: Visualizing `Structure` objects. Handles chunking meshes and transparency sorting.
+    - **Thought Process**: Specific optimizations for drawing static structures (vs dynamic world chunks).
+    - **Dependencies**: `Structure`, `RenderingSystem`.
+
+19. Structures.md
+    - **Core Functionality**: The *generation* of structures in the world (e.g., placing a Village). `StructureSet`, `StructurePlacement`, `JigsawStructure`.
+    - **Thought Process**: Logic for *where* structures spawn, not just what they look like.
+    - **Dependencies**: `WorldGen`, `BiomesAndClimate`.
+
+20. UtilitiesAndHelpers.md
+    - **Core Functionality**: Aggregates math, random, and noise utilities.
+    - **Thought Process**: Summary reference for the helper modules.
+    - **Dependencies**: `MathUtilities`, `RandomNumberGeneration`.
+
+21. WorldGen.md
+    - **Core Functionality**: High-level orchestration of terrain generation. `NoiseChunkGenerator`, `NoiseRouter`, `Aquifer`.
+    - **Thought Process**: The master controller that uses Density Functions and Biomes to build the world.
+    - **Dependencies**: All `worldgen/*` modules.
+
+Future Roadmap:
+1.  **Structure Viewer**: Create a tool to load `.nbt` structure files and render them using `StructureRenderer`, allowing users to inspect individual templates (e.g., `village/plains/house_1.nbt`).
+2.  **Datapack Visualizer**: Allow users to drag-and-drop a zip file (datapack) to visualize custom biomes or noise settings using the `Deepslate` engine.
+3.  **Isometric Screenshot Generator**: Use the `Renderer` to capture high-res images of structures or chunks for wiki/documentation use.
+4.  **Biome Map 2.0**: Enhance the Seed Explorer to support clicking a point to see the full "Climate Target" values (Temp, Humidity, etc.) for debugging generation.
+
+System Prompt Context:
+-   **Library**: `deepslate` (by Misode).
+-   **Key Classes**: `Structure`, `StructureRenderer`, `NoiseChunkGenerator`, `RandomState`, `MultiNoiseBiomeSource`.
+-   **Coordinate System**: Block coords (x, y, z). Biome sampling often happens at 1:4 scale (quart-resolution).
+-   **Data Loading**: Requires fetching `noise_settings` and `dimension` JSONs from `misode/mcmeta` or a datapack to initialize the engine properly.
+-   **Rendering**: Uses WebGL via `gl-matrix` math. Requires resource loading (textures, models) for visual output.

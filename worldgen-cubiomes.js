@@ -274,9 +274,35 @@ class CubiomesWorldgen extends WorldgenInterface {
                 throw new Error(`setupGenerator failed with return code ${r}`);
             }
 
-            const seedValue = typeof seed === "string" ? this.hashString(seed) : Number(seed);
-            console.log(`[Cubiomes] Calling _applySeed(ptr=${ptr}, dim=${dimEnum}, seed=${seedValue})`);
-            this.cubiomes._applySeed(ptr, dimEnum, seedValue);
+            let seedBig;
+            try {
+                if (typeof seed === 'bigint') {
+                    seedBig = seed;
+                } else if (typeof seed === 'number') {
+                    seedBig = BigInt(Math.floor(seed));
+                } else if (typeof seed === 'string') {
+                    if (/^-?\d+$/.test(seed)) {
+                        seedBig = BigInt(seed);
+                    } else {
+                        // String hash is 32-bit
+                        seedBig = BigInt(this.hashString(seed));
+                    }
+                } else {
+                    seedBig = 0n;
+                }
+            } catch (e) {
+                console.warn("[Cubiomes] Seed parse error, defaulting to 0", e);
+                seedBig = 0n;
+            }
+
+            // Split 64-bit seed into two 32-bit integers for WASM
+            const low = Number(seedBig & 0xFFFFFFFFn);
+            const high = Number((seedBig >> 32n) & 0xFFFFFFFFn);
+
+            console.log(`[Cubiomes] Calling _applySeed(ptr=${ptr}, dim=${dimEnum}, low=${low}, high=${high})`);
+            
+            // Pass split 64-bit arguments
+            this.cubiomes._applySeed(ptr, dimEnum, low, high);
             console.log(`[Cubiomes] _applySeed complete`);
 
             const gen = { ptr, seed, version, dimension };
